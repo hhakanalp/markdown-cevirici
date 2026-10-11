@@ -194,5 +194,54 @@ class Uygulama(tk.Tk):
             subprocess.run(["xdg-open", str(self.son_klasor)])
 
 
+def log_klasoru() -> Path:
+    if sys.platform.startswith("win"):
+        taban = Path(os.environ.get("LOCALAPPDATA", Path.home()))
+    else:
+        taban = Path.home() / "Library" / "Logs" if sys.platform == "darwin" else Path.home()
+    klasor = taban / "MarkdownCevirici"
+    klasor.mkdir(parents=True, exist_ok=True)
+    return klasor
+
+
+def oz_test(rapor: Path) -> int:
+    """Derleme sonrası kontrol: paketlenmiş uygulamada tüm çeviricilerin yüklendiğini doğrular."""
+    import tempfile
+    satirlar = []
+    hata = False
+    for modul in ["markitdown", "pdfminer.high_level", "pdfplumber", "mammoth", "pptx", "openpyxl", "pandas", "bs4"]:
+        try:
+            __import__(modul)
+            satirlar.append(f"OK   {modul}")
+        except Exception as e:
+            hata = True
+            satirlar.append(f"HATA {modul}: {e!r}")
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            ornek = Path(d) / "ornek.csv"
+            ornek.write_text("Ad,Yaş\nAyşe,30\n", encoding="utf-8")
+            metin = cevir(ornek, None).read_text(encoding="utf-8")
+            if "Ayşe" not in metin:
+                raise ValueError(metin)
+            satirlar.append("OK   csv -> md")
+    except Exception as e:
+        hata = True
+        satirlar.append(f"HATA csv -> md: {e!r}")
+    rapor.write_text("\n".join(satirlar), encoding="utf-8")
+    return 1 if hata else 0
+
+
 if __name__ == "__main__":
-    Uygulama().mainloop()
+    if len(sys.argv) == 3 and sys.argv[1] == "--selftest":
+        sys.exit(oz_test(Path(sys.argv[2])))
+    try:
+        Uygulama().mainloop()
+    except Exception:
+        import traceback
+        kayit = log_klasoru() / "hata.log"
+        kayit.write_text(traceback.format_exc(), encoding="utf-8")
+        try:
+            messagebox.showerror("Markdown Çevirici", f"Uygulama başlatılamadı.\nAyrıntılar: {kayit}")
+        except Exception:
+            pass
+        raise
