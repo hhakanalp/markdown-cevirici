@@ -1,0 +1,47 @@
+name: Uygulamayi derle
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: Windows
+          - os: macos-latest
+            name: macOS
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Paketleri kur
+        run: |
+          python -m pip install --upgrade pip
+          pip install "markitdown[all]" pyinstaller
+
+      - name: Uygulamayi paketle
+        run: >
+          python -m PyInstaller --noconfirm --windowed --name "Markdown Cevirici"
+          --collect-all markitdown --collect-all magika md_cevirici.py
+
+      - name: Zip (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path "dist/Markdown Cevirici" -DestinationPath "Markdown-Cevirici-Windows.zip"
+
+      - name: Zip (macOS)
+        if: runner.os == 'macOS'
+        run: ditto -c -k --keepParent "dist/Markdown Cevirici.app" "Markdown-Cevirici-macOS.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Markdown-Cevirici-${{ matrix.name }}
+          path: Markdown-Cevirici-*.zip
